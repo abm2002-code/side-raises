@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Side Raises Pose Detection</title>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
+    <style>
+        body { text-align: center; font-family: Arial, sans-serif; }
+        video, canvas { position: absolute; left: 50%; transform: translateX(-50%); top: 10%; }
+        #warning { position: absolute; top: 5%; left: 50%; transform: translateX(-50%); color: red; font-size: 24px; font-weight: bold; }
+        #debug { position: absolute; top: 80%; left: 10%; color: white; font-size: 14px; text-align: left; }
+    </style>
+</head>
+<body>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas"></canvas>
+    <div id="warning"></div>
+    <div id="debug"></div>
+    <audio id="shoulderLengthAudio" src="shoulder_length.mp3" preload="auto"></audio>
+    <audio id="shortRomAudio" src="short_rom.mp3" preload="auto"></audio>
+    
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const warningText = document.getElementById('warning');
+        const debugText = document.getElementById('debug');
+        const shoulderLengthAudio = document.getElementById('shoulderLengthAudio');
+        const shortRomAudio = document.getElementById('shortRomAudio');
+        
+        // Flags for short range of motion detection
+        let leftRomFlag = false;
+        let rightRomFlag = false;
+        let checkedR = false;
+        let checkedL = false;
+        
+        const pose = new Pose({ locateFile: file => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` });
+        pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+
+        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+            };
+        });
+
+        function calculateAngle(a, b, c) {
+            const ba = { x: a.x - b.x, y: a.y - b.y };
+            const bc = { x: c.x - b.x, y: c.y - b.y };
+            const dotProduct = ba.x * bc.x + ba.y * bc.y;
+            const magnitudeBA = Math.sqrt(ba.x ** 2 + ba.y ** 2);
+            const magnitudeBC = Math.sqrt(bc.x ** 2 + bc.y ** 2);
+            const angle = Math.acos(dotProduct / (magnitudeBA * magnitudeBC)) * (180 / Math.PI);
+            return angle;
+        }
+
+        pose.onResults(results => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            if (results.poseLandmarks) {
+                // Draw pose landmarks and connections
+                drawConnectors(ctx, results.poseLandmarks, POSE_CONNECTIONS, { color: '#00FF00', lineWidth: 4 });
+                drawLandmarks(ctx, results.poseLandmarks, { color: '#FF0000', lineWidth: 2 });
+
+                const landmarks = results.poseLandmarks;
+                
+                // Get keypoints for both arms
+                const leftHip = landmarks[23]; // LEFT_HIP
+                const leftShoulder = landmarks[11]; // LEFT_SHOULDER
+                const leftElbow = landmarks[13]; // LEFT_ELBOW
+                
+                const rightHip = landmarks[24]; // RIGHT_HIP
+                const rightShoulder = landmarks[12]; // RIGHT_SHOULDER
+                const rightElbow = landmarks[14]; // RIGHT_ELBOW
+                
+                // Calculate angles for side raises
+                const leftArmAngle = calculateAngle(leftHip, leftShoulder, leftElbow);
+                const rightArmAngle = calculateAngle(rightHip, rightShoulder, rightElbow);
+                
+                // Display angles
+                ctx.fillStyle = "white";
+                ctx.font = "18px Arial";
+                ctx.fillText(`Left Arm Angle: ${Math.round(leftArmAngle)}°`, 50, 50);
+                ctx.fillText(`Right Arm Angle: ${Math.round(rightArmAngle)}°`, 400, 50);
+                
+                // Reset flags when arms are down
+                if (leftArmAngle < 30) {
+                    checkedL = false;
+                }
+                if (rightArmAngle < 30) {
+                    checkedR = false;
+                }
+                
+                // Check for proper ROM - arms should reach at least 45 degrees
+                if (leftArmAngle >= 45) {
+                    leftRomFlag = true;
+                }
+                if (rightArmAngle >= 45) {
+                    rightRomFlag = true;
+                }
+                
+                // Check for short ROM when arms return to shoulder level
+                let shortRom = false;
+                if (leftArmAngle >= 90 && !checkedL) {
+                    if (!leftRomFlag) {
+                        shortRom = true;
+                    } else {
+                        leftRomFlag = false;
+                        checkedL = true;
+                    }
+                }
+                
+                if (rightArmAngle >= 90 && !checkedR) {
+                    if (!rightRomFlag) {
+                        shortRom = true;
+                    } else {
+                        rightRomFlag = false;
+                        checkedR = true;
+                    }
+                }
+                
+                // Check if arms are raised beyond shoulder length
+                const shoulderLengthIssue = (leftArmAngle > 100 || rightArmAngle > 100);
+                
+                // Handle warnings and audio feedback
+                if (shoulderLengthIssue && shoulderLengthAudio.paused) {
+                    warningText.innerText = "Keep arms at shoulder level!";
+                    shoulderLengthAudio.play();
+                } 
+                else if (shortRom && shortRomAudio.paused) {
+                    warningText.innerText = "Use full range of motion!";
+                    shortRomAudio.play();
+                }
+                else if (!shoulderLengthIssue && !shortRom) {
+                    warningText.innerText = "";
+                }
+                
+                // Debug information
+                debugText.innerText = `Left ROM Flag: ${leftRomFlag}\nRight ROM Flag: ${rightRomFlag}\nChecked L: ${checkedL}\nChecked R: ${checkedR}\nShort ROM: ${shortRom}`;
+            }
+        });
+
+        const camera = new Camera(video, {
+            onFrame: async () => { await pose.send({ image: video }); },
+            width: 640,
+            height: 480
+        });
+        camera.start();
+    </script>
+</body>
+</html>
