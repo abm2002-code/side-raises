@@ -418,7 +418,7 @@
                 //     }
                 // }
                 // 2. Arms raised too high (above shoulder)
-                else if ((leftArmAngle > 110 || rightArmAngle > 110) && !isInMistakeState) {
+                if ((leftArmAngle > 110 || rightArmAngle > 110) && !isInMistakeState) {
                     warningText.innerText = "Don't raise arms above shoulder!";
                     playAudio(shoulderLengthAudio);
                     mistakeCount++;
