@@ -409,14 +409,14 @@
                 
                 // Check for form issues
                 // 1. Arms not raised to shoulder level
-                if ((leftRomFlag && leftArmAngle < 70) || (rightRomFlag && rightArmAngle < 70)) {
-                    if (!isInMistakeState) {
-                        warningText.innerText = "Raise arms to shoulder level!";
-                        playAudio(shortRomAudio);
-                        mistakeCount++;
-                        isInMistakeState = true;
-                    }
-                }
+                // if ((leftRomFlag && leftArmAngle < 70) || (rightRomFlag && rightArmAngle < 70)) {
+                //     if (!isInMistakeState) {
+                //         warningText.innerText = "Raise arms to shoulder level!";
+                //         playAudio(shortRomAudio);
+                //         mistakeCount++;
+                //         isInMistakeState = true;
+                //     }
+                // }
                 // 2. Arms raised too high (above shoulder)
                 else if ((leftArmAngle > 110 || rightArmAngle > 110) && !isInMistakeState) {
                     warningText.innerText = "Don't raise arms above shoulder!";
