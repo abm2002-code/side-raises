@@ -283,28 +283,38 @@
       }, 2000);
     }
 
-    function startExercise() {
-      isExercising = true;
-      repCount = 0;
-      mistakeCount = 0;
-      isInMistakeState = false;
-      
-      // Reset ROM tracking
-      leftRomFlag = false;
-      rightRomFlag = false;
-      checkedL = false;
-      checkedR = false;
-      
-      // Update UI
-      startButton.classList.add('hidden');
-      stopButton.classList.remove('hidden');
-      resetButton.classList.add('hidden');
-      
-      // Start timer
-      exerciseStartTime = Date.now();
-      exerciseTimer = setInterval(updateExerciseTime, 1000);
-      showVoiceToast('Workout started');
+     function beginWorkout() {
+  isExercising = true;
+  mistakeCount = 0;
+  isInMistakeState = false;
+
+  // Update UI
+  startButton.classList.add('hidden');
+  stopButton.classList.remove('hidden');
+  resetButton.classList.add('hidden');
+  startButton.disabled = false;
+
+  // Start timer
+  exerciseStartTime = Date.now();
+  exerciseTimer = setInterval(updateExerciseTime, 1000);
+}
+
+   function startExercise() {
+  let countdown = 3;
+  exerciseTimeElement.textContent = `Starting in ${countdown}`;
+  startButton.disabled = true;
+
+  const countdownInterval = setInterval(() => {
+    countdown--;
+    if (countdown > 0) {
+      exerciseTimeElement.textContent = `Starting in ${countdown}`;
+    } else {
+      clearInterval(countdownInterval);
+      beginWorkout();
     }
+  }, 1000);
+}
+
 
     function stopExercise() {
       isExercising = false;
