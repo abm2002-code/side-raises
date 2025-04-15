@@ -134,14 +134,19 @@
 
     function beginWorkout() {
       isExercising = true;
+      repCount = 0;
       mistakeCount = 0;
       isInMistakeState = false;
+      leftRomFlag = false;
+      rightRomFlag = false;
+      checkedR = false;
+      checkedL = false;
 
       // Update UI
       startButton.classList.add('hidden');
       stopButton.classList.remove('hidden');
       resetButton.classList.add('hidden');
-      startButton.disabled = false;
+      warningText.innerText = "";
 
       // Start timer
       exerciseStartTime = Date.now();
@@ -157,9 +162,12 @@
         countdown--;
         if (countdown > 0) {
           exerciseTimeElement.textContent = `Starting in ${countdown}`;
-        } else {
-          clearInterval(countdownInterval);
-          beginWorkout();
+        } else if (countdown === 0) {
+          exerciseTimeElement.textContent = `GO!`;
+          setTimeout(() => {
+            clearInterval(countdownInterval);
+            beginWorkout();
+          }, 500); // Short delay to show "GO!"
         }
       }, 1000);
     }
@@ -182,6 +190,7 @@
     function resetExercise() {
       resetButton.classList.add('hidden');
       startButton.classList.remove('hidden');
+      startButton.disabled = false;
       exerciseTimeElement.textContent = "00:00";
       warningText.innerText = "";
     }
