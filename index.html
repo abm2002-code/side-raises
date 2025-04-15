@@ -9,6 +9,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils"></script>
     <!-- Reference to GitHub-hosted stylesheet via jsDelivr CDN -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/abm2002-code/fitflex-styles@main/styles.css">
+    <style>
+      /* Hide only debug information */
+      #debug {
+        display: none;
+      }
+    </style>
 </head>
 <body>
   <div class="container">
@@ -24,27 +30,6 @@
       <div id="debug"></div>
       <div class="angle-display">
         Arm Angle: <span id="arm-angle" class="angle-value">0°</span>
-      </div>
-      <div class="voice-indicator">
-        <div class="voice-dot"></div>
-        Voice Control Active
-      </div>
-      <div class="voice-commands-help">
-        <div class="voice-help-toggle">Voice Commands Help</div>
-        <div class="voice-commands-list">
-          <div class="voice-command-item">
-            <span class="command">Start / Begin / Go</span>
-            <span class="action">Start workout</span>
-          </div>
-          <div class="voice-command-item">
-            <span class="command">Stop / End / Finish</span>
-            <span class="action">Stop workout</span>
-          </div>
-          <div class="voice-command-item">
-            <span class="command">Reset / Restart</span>
-            <span class="action">Reset workout</span>
-          </div>
-        </div>
       </div>
     </div>
     
@@ -73,8 +58,6 @@
       </div>
       <button id="close-results" class="button close">Close</button>
     </div>
-    
-    <div id="voice-toast" class="voice-command-toast">Command recognized</div>
   </div>
   
   <audio id="shoulderLengthAudio" src="shoulder_length.mp3" preload="auto"></audio>
@@ -99,7 +82,6 @@
     const resetButton = document.getElementById('reset-button');
     const resultsPanel = document.getElementById('results');
     const closeResultsButton = document.getElementById('close-results');
-    const voiceToast = document.getElementById('voice-toast');
     
     // State variables
     let repCount = 0;
@@ -109,7 +91,6 @@
     let exerciseTimer;
     let isExercising = false;
     let totalExerciseTime = 0;
-    let recognition = null;
     
     // Flags for short range of motion detection
     let leftRomFlag = false;
@@ -151,170 +132,37 @@
         }
     }
 
-    // Initialize always-active speech recognition
-    function initSpeechRecognition() {
-      if ('webkitSpeechRecognition' in window) {
-        recognition = new webkitSpeechRecognition();
-        recognition.continuous = true;
-        recognition.interimResults = false;
-        recognition.lang = 'en-US';
+    function beginWorkout() {
+      isExercising = true;
+      mistakeCount = 0;
+      isInMistakeState = false;
 
-        // Voice indicator elements
-        const voiceIndicator = document.querySelector('.voice-indicator');
-        const voiceDot = document.querySelector('.voice-dot');
+      // Update UI
+      startButton.classList.add('hidden');
+      stopButton.classList.remove('hidden');
+      resetButton.classList.add('hidden');
+      startButton.disabled = false;
 
-        recognition.onstart = function() {
-          console.log('Voice recognition started');
-          voiceIndicator.style.backgroundColor = 'rgba(0, 255, 127, 0.3)';
-          voiceDot.style.animation = 'pulse 2s infinite';
-        };
-
-        recognition.onresult = function(event) {
-          const last = event.results.length - 1;
-          const command = event.results[last][0].transcript.trim().toLowerCase();
-          const confidence = event.results[last][0].confidence;
-          console.log('Voice command:', command, 'Confidence:', confidence);
-
-          // Flash the indicator to show a command was heard
-          voiceIndicator.style.backgroundColor = 'rgba(0, 255, 127, 0.7)';
-          setTimeout(() => {
-            voiceIndicator.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-          }, 300);
-
-          // Only process commands with decent confidence
-          if (confidence > 0.3) {
-            // Start command variations
-            if (
-              command.includes('start') ||
-              command.includes('begin') ||
-              command.includes('go') ||
-              command.includes('start workout')
-            ) {
-              if (!isExercising && !resetButton.classList.contains('hidden')) {
-                resetExercise();
-                setTimeout(() => startExercise(), 500);
-              } else if (!isExercising) {
-                startExercise();
-              }
-              showVoiceToast('Starting workout');
-            }
-            // Stop command variations
-            else if (
-              command.includes('stop') ||
-              command.includes('end') ||
-              command.includes('finish') ||
-              command.includes('stop workout') ||
-              command.includes('end workout')
-            ) {
-              if (isExercising) {
-                stopExercise();
-                showVoiceToast('Stopping workout');
-              }
-            }
-            // Reset command variations
-            else if (
-              command.includes('reset') ||
-              command.includes('restart') ||
-              command.includes('start over') ||
-              command.includes('clear')
-            ) {
-              if (!startButton.classList.contains('hidden')) {
-                resetExercise();
-                showVoiceToast('Resetting workout');
-              }
-            }
-          }
-        };
-
-        recognition.onerror = function(event) {
-          console.log('Error occurred in recognition: ' + event.error);
-          // Visual indication of error
-          voiceIndicator.style.backgroundColor = 'rgba(255, 59, 48, 0.3)';
-          setTimeout(() => {
-            voiceIndicator.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
-          }, 1000);
-
-          // Restart recognition after error
-          setTimeout(() => {
-            try {
-              recognition.start();
-            } catch (e) {
-              console.log('Could not restart speech recognition after error');
-            }
-          }, 1000);
-        };
-
-        recognition.onend = function() {
-          console.log('Voice recognition ended');
-          // Visual indication speech recognition ended
-          voiceDot.style.animation = 'none';
-          // Restart recognition to keep it continuous
-          setTimeout(() => {
-            try {
-              recognition.start();
-            } catch (e) {
-              console.log('Could not restart speech recognition');
-            }
-          }, 500);
-        };
-
-        // Start recognition automatically
-        try {
-          recognition.start();
-        } catch (e) {
-          console.log('Could not start speech recognition', e);
-          voiceIndicator.style.display = 'none';
-        }
-      } else {
-        console.log('Speech Recognition not supported');
-        document.querySelector('.voice-indicator').style.display = 'none';
-      }
+      // Start timer
+      exerciseStartTime = Date.now();
+      exerciseTimer = setInterval(updateExerciseTime, 1000);
     }
 
-    // Toast notification for voice commands
-    function showVoiceToast(message) {
-      voiceToast.textContent = message;
-      voiceToast.classList.add('show');
-      if (voiceToast.timeoutId) {
-        clearTimeout(voiceToast.timeoutId);
-      }
-      voiceToast.timeoutId = setTimeout(() => {
-        voiceToast.classList.remove('show');
-      }, 2000);
-    }
-
-     function beginWorkout() {
-  isExercising = true;
-  mistakeCount = 0;
-  isInMistakeState = false;
-
-  // Update UI
-  startButton.classList.add('hidden');
-  stopButton.classList.remove('hidden');
-  resetButton.classList.add('hidden');
-  startButton.disabled = false;
-
-  // Start timer
-  exerciseStartTime = Date.now();
-  exerciseTimer = setInterval(updateExerciseTime, 1000);
-}
-
-   function startExercise() {
-  let countdown = 3;
-  exerciseTimeElement.textContent = `Starting in ${countdown}`;
-  startButton.disabled = true;
-
-  const countdownInterval = setInterval(() => {
-    countdown--;
-    if (countdown > 0) {
+    function startExercise() {
+      let countdown = 3;
       exerciseTimeElement.textContent = `Starting in ${countdown}`;
-    } else {
-      clearInterval(countdownInterval);
-      beginWorkout();
-    }
-  }, 1000);
-}
+      startButton.disabled = true;
 
+      const countdownInterval = setInterval(() => {
+        countdown--;
+        if (countdown > 0) {
+          exerciseTimeElement.textContent = `Starting in ${countdown}`;
+        } else {
+          clearInterval(countdownInterval);
+          beginWorkout();
+        }
+      }, 1000);
+    }
 
     function stopExercise() {
       isExercising = false;
@@ -382,8 +230,8 @@
             const leftArmAngle = calculateAngle(leftHip, leftShoulder, leftElbow);
             const rightArmAngle = calculateAngle(rightHip, rightShoulder, rightElbow);
             
-                        // Update angle display (average of both arms)
-                        const avgArmAngle = (leftArmAngle + rightArmAngle) / 2;
+            // Update angle display (average of both arms)
+            const avgArmAngle = (leftArmAngle + rightArmAngle) / 2;
             armAngleElement.textContent = `${Math.round(avgArmAngle)}°`;
             
             if (isExercising) {
@@ -418,16 +266,7 @@
                 }
                 
                 // Check for form issues
-                // 1. Arms not raised to shoulder level
-                // if ((leftRomFlag && leftArmAngle < 70) || (rightRomFlag && rightArmAngle < 70)) {
-                //     if (!isInMistakeState) {
-                //         warningText.innerText = "Raise arms to shoulder level!";
-                //         playAudio(shortRomAudio);
-                //         mistakeCount++;
-                //         isInMistakeState = true;
-                //     }
-                // }
-                // 2. Arms raised too high (above shoulder)
+                // Arms raised too high (above shoulder)
                 if ((leftArmAngle > 110 || rightArmAngle > 110) && !isInMistakeState) {
                     warningText.innerText = "Don't raise arms above shoulder!";
                     playAudio(shoulderLengthAudio);
@@ -443,7 +282,7 @@
                 }
             }
             
-            // Debug information
+            // Debug information - hidden via CSS but still updating in the background
             debugText.innerHTML = `
                 Left Arm: ${Math.round(leftArmAngle)}°<br>
                 Right Arm: ${Math.round(rightArmAngle)}°<br>
@@ -469,21 +308,6 @@
             canvas.style.width = '100%';
             canvas.style.height = 'auto';
         }
-    });
-    
-    // Initialize speech recognition when DOM is loaded
-    window.addEventListener('DOMContentLoaded', () => {
-      setTimeout(() => {
-        initSpeechRecognition();
-      }, 1000);
-    });
-    
-    // Set up voice help toggle
-    const voiceHelpToggle = document.querySelector('.voice-help-toggle');
-    const voiceCommandsList = document.querySelector('.voice-commands-list');
-    
-    voiceHelpToggle.addEventListener('click', () => {
-        voiceCommandsList.classList.toggle('show');
     });
   </script>
 </body>
